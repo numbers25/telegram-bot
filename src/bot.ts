@@ -5,6 +5,7 @@ import { addBook } from "./commands/addBook";
 import { MyContext, MySession } from "./utils/types";
 import { listBooks } from "./commands/listBooks";
 import { setCurrentBook } from "./commands/setCurrentBook";
+import { isCurrent } from "./commands/isCurrent";
 
 config();
 
@@ -20,9 +21,7 @@ bot.use(createConversation(addBook));
 
 // COMMANDS
 bot.command("start", async (ctx) => {
-  await ctx.reply(
-    "📚 Welcome to the Book Club Bot! Type /help to see what you can do."
-  );
+  await ctx.reply("📚 Hey bookworm, type /help to see what you can do...");
   console.log(
     `🤖 User ${ctx.from?.username} (${ctx.from?.id}) started the bot.`
   );
@@ -38,6 +37,9 @@ bot.command("listbooks", listBooks);
 
 // Set the current book for the month
 bot.command("setcurrent", setCurrentBook);
+
+// Check the current book
+bot.command("current", isCurrent);
 
 bot.start();
 console.log("🤖 Bot is running...");

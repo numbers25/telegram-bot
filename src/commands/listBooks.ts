@@ -14,5 +14,5 @@ export async function listBooks(ctx: MyContext) {
     .map((b, i) => `${i + 1}. ${b.title} — ${b.author}`)
     .join("\n");
 
-  await ctx.reply(`📚 Book List:\n${list}`);
+  await ctx.reply(`📚 *Book List*\n${list}`, { parse_mode: "Markdown" });
 }
