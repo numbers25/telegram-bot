@@ -23,6 +23,9 @@ bot.command("start", async (ctx) => {
   await ctx.reply(
     "📚 Welcome to the Book Club Bot! Type /help to see what you can do."
   );
+  console.log(
+    `🤖 User ${ctx.from?.username} (${ctx.from?.id}) started the bot.`
+  );
 });
 
 bot.command("addbook", async (ctx) => {
