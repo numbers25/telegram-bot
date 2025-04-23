@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@grammyjs/conversations':
+        specifier: ^2.1.0
+        version: 2.1.0(grammy@1.36.1)
       '@prisma/client':
         specifier: ^6.6.0
         version: 6.6.0(prisma@6.6.0(typescript@5.8.3))(typescript@5.8.3)
@@ -186,6 +189,12 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@grammyjs/conversations@2.1.0':
+    resolution: {integrity: sha512-nYoHwFyXcQ2lkQejKReoINknkgFjeIZhyJNMBwHng5UHO/ewHKs1dV2XVaLrKkHTZ1gCZ+dKkjEp26wwHyQeGg==}
+    engines: {node: ^12.20.0 || >=14.13.1}
+    peerDependencies:
+      grammy: ^1.20.1
 
   '@grammyjs/types@3.20.0':
     resolution: {integrity: sha512-KIoikN5VTj6dcJpzMwXtouzaN3BZJ4jihBuEeXzWr25HtEfCF25V3dN11u+uNYi/9sBDvs0KCKZhyN/xFY0MBg==}
@@ -447,6 +456,10 @@ snapshots:
 
   '@esbuild/win32-x64@0.25.3':
     optional: true
+
+  '@grammyjs/conversations@2.1.0(grammy@1.36.1)':
+    dependencies:
+      grammy: 1.36.1
 
   '@grammyjs/types@3.20.0': {}
 

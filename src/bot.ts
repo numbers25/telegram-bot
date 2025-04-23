@@ -1,49 +1,35 @@
-// File: src/bot.ts
-import { Bot, session, Context, SessionFlavor } from "grammy";
+import { Bot, session } from "grammy";
 import { config } from "dotenv";
+import { conversations, createConversation } from "@grammyjs/conversations";
+import { addBook } from "./commands/addBook";
+import { MyContext, MySession } from "./utils/types";
+import { listBooks } from "./commands/listBooks";
 
 config();
 
-type MySession = {
-  votes: Record<string, number>;
-  books: string[];
-};
-
-type MyContext = Context & SessionFlavor<MySession>;
-
 function createInitialSession(): MySession {
-  return { votes: {}, books: [] };
+  return { votes: {} };
 }
 
 const bot = new Bot<MyContext>(process.env.BOT_API!);
 
+// Middleware order matters
 bot.use(session({ initial: createInitialSession }));
+bot.use(conversations());
+bot.use(createConversation(addBook));
 
-// Command: /start
+// Commands
 bot.command("start", async (ctx) => {
   await ctx.reply(
     "📚 Welcome to the Book Club Bot! Type /help to see what you can do."
   );
 });
 
-// Command: /addbook <title>
 bot.command("addbook", async (ctx) => {
-  const title = ctx.message?.text?.split(" ").slice(1).join(" ");
-  if (!title)
-    return ctx.reply("❗ Please provide a book title, like: /addbook Dune");
-  ctx.session.books.push(title);
-  await ctx.reply(`✅ Added "${title}" to the book list.`);
+  await ctx.conversation.enter("addBook");
 });
 
-// Command: /listbooks
-bot.command("listbooks", async (ctx) => {
-  if (ctx.session.books.length === 0) {
-    return ctx.reply("📭 No books have been added yet.");
-  }
-  const list = ctx.session.books.map((b, i) => `${i + 1}. ${b}`).join("\n");
-  await ctx.reply(`📚 Book List:\n${list}`);
-});
+bot.command("listbooks", listBooks);
 
-// Start bot
 bot.start();
 console.log("🤖 Bot is running...");
