@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@grammyjs/conversations": "^2.1.0",
     "@prisma/client": "^6.6.0",
     "dotenv": "^16.5.0",
     "grammy": "^1.36.1"
