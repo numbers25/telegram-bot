@@ -15,11 +15,13 @@
     "cron": "^4.3.0",
     "dotenv": "^16.5.0",
     "grammy": "^1.36.1",
-    "node-cron": "^3.0.3"
+    "node-cron": "^3.0.3",
+    "node-schedule": "^2.1.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.1",
     "@types/node-cron": "^3.0.11",
+    "@types/node-schedule": "^2.1.7",
     "prisma": "^6.6.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"

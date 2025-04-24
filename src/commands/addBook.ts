@@ -1,33 +1,20 @@
 import { Conversation } from "@grammyjs/conversations";
 import { MyContext } from "../utils/types";
 import { prisma } from "../utils/prisma";
+import { ensureEntities } from "../utils/ensureEntities";
+import { isAdmin } from "../utils/isAdmin";
+import { listBooks } from "./listBooks";
 
 export async function addBook(
   conv: Conversation<MyContext, MyContext>,
   ctx: MyContext
 ) {
-  // Ensure chat and user exist/upsert
-  const tgChatId = ctx.chat!.id.toString();
-  const chat = await prisma.chat.upsert({
-    where: { telegramChatId: tgChatId },
-    update: { title: ctx.chat?.title },
-    create: { telegramChatId: tgChatId, title: ctx.chat?.title! },
-  });
-  const tgUserId = ctx.from!.id.toString();
-  const user = await prisma.user.upsert({
-    where: { telegramUserId: tgUserId },
-    update: {
-      username: ctx.from?.username,
-      firstName: ctx.from?.first_name,
-      lastName: ctx.from?.last_name,
-    },
-    create: {
-      telegramUserId: tgUserId,
-      username: ctx.from?.username,
-      firstName: ctx.from?.first_name,
-      lastName: ctx.from?.last_name,
-    },
-  });
+  const { chat, user } = await ensureEntities(ctx);
+  if (!chat || !user) {
+    return ctx.reply(
+      "Something went wrong while resolving chat. Please try again."
+    );
+  }
 
   // Find upcoming poll (isActive=true) and check suggestion window
   const now = new Date();
@@ -45,14 +32,16 @@ export async function addBook(
     );
   }
 
-  // Enforce one suggestion per user per poll
-  const existing = await prisma.bookOption.findUnique({
-    where: {
-      pollId_suggestedById: { pollId: poll.id, suggestedById: user.id },
-    },
-  });
-  if (existing) {
-    return ctx.reply("You’ve already suggested a book for this poll :-(");
+  if (!isAdmin(ctx.from!.id)) {
+    const existing = await prisma.bookOption.findFirst({
+      where: {
+        pollId: poll.id,
+        suggestedById: user.id,
+      },
+    });
+    if (existing) {
+      return ctx.reply("You’ve already suggested a book for this poll :-(");
+    }
   }
 
   // Multi-step input: title & author
@@ -70,6 +59,22 @@ export async function addBook(
     return ctx.reply("❗ Author cannot be empty. Try /suggest again.");
   }
 
+  const poolCount = await prisma.bookOption.count({
+    where: { pollId: poll.id },
+  });
+  if (poolCount >= 5) {
+    const oldest = await prisma.bookOption.findFirst({
+      where: { pollId: poll.id },
+      orderBy: { createdAt: "asc" },
+    });
+    if (oldest) {
+      await prisma.bookOption.delete({ where: { id: oldest.id } });
+      await ctx.reply(
+        `❗ Limit of 5 suggestions is full. Removed the oldest suggestion: "${oldest.title} by ${oldest.author}".`
+      );
+    }
+  }
+
   // Create suggestion
   await prisma.bookOption.create({
     data: {
@@ -80,9 +85,6 @@ export async function addBook(
     },
   });
 
-  await ctx.reply(
-    `✅ Suggested "${title}"${
-      author ? ` by ${author}` : ""
-    } for the upcoming vote!`
-  );
+  await ctx.reply(`✅ Suggested "${title}" by ${author}.`);
+  await listBooks(ctx);
 }

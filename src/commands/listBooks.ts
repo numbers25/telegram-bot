@@ -1,27 +1,33 @@
 import { MyContext } from "../utils/types";
 import { prisma } from "../utils/prisma";
+import { ensureEntities } from "../utils/ensureEntities";
 
 export async function listBooks(ctx: MyContext) {
-  const tgChatId = ctx.chat?.id.toString();
-  if (!tgChatId) {
+  const { chat } = await ensureEntities(ctx);
+  if (!chat) {
     return ctx.reply("🚫 Unable to identify this chat.");
   }
 
-  // Fetch the active poll and its suggestions for this chat
-  const poll = await prisma.poll.findFirst({
-    where: { chat: { telegramChatId: tgChatId }, isActive: true },
+  let poll = await prisma.poll.findFirst({
+    where: { chatId: chat.id, isActive: true },
     include: { options: { orderBy: { createdAt: "asc" } } },
   });
+
   if (!poll) {
-    return ctx.reply("📭 There is no active vote right now.");
+    poll = await prisma.poll.findFirst({
+      where: { chatId: chat.id },
+      include: { options: { orderBy: { createdAt: "asc" } } },
+      orderBy: { startDate: "desc" },
+    });
   }
 
-  const options = poll.options;
-  if (options.length === 0) {
-    return ctx.reply("📭 No suggestions have been made yet.");
+  if (!poll || poll.options.length === 0) {
+    return ctx.reply(
+      "📭 No book suggestions have been made yet. Type /suggest to suggest a book!"
+    );
   }
 
-  const list = options
+  const list = poll.options
     .map(
       (opt, i) =>
         `${i + 1}. ${opt.title}${opt.author ? ` — ${opt.author}` : ""}`

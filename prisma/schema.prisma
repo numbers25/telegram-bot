@@ -19,23 +19,33 @@ model BookOption {
   currentRead   Boolean  @default(false)
   votes         Vote[]
 
-  @@unique([pollId, suggestedById]) // each book appears only once per poll
+  @@unique([pollId, author, title]) // each book appears only once per poll
   @@index([pollId, currentRead])
 }
 
+model ReadBook {
+  id     Int      @id @default(autoincrement())
+  chat   Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId Int
+  title  String
+  author String
+  readAt DateTime @default(now())
+}
+
 model Chat {
-  id             Int      @id @default(autoincrement())
-  telegramChatId String   @unique // the raw chat ID from Telegram
+  id             Int        @id @default(autoincrement())
+  telegramChatId String     @unique
   title          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
   polls          Poll[]
   users          User[]
+  readBooks      ReadBook[]
 }
 
 model User {
   id             Int          @id @default(autoincrement())
-  telegramUserId String       @unique // the raw user ID from Telegram
+  telegramUserId String       @unique
   username       String?
   firstName      String?
   lastName       String?
@@ -47,16 +57,17 @@ model User {
 }
 
 model Poll {
-  id        Int          @id @default(autoincrement())
-  chat      Chat         @relation(fields: [chatId], references: [id])
-  chatId    Int
-  title     String?
-  startDate DateTime
-  endDate   DateTime
-  isActive  Boolean      @default(true)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  options   BookOption[]
+  id         Int          @id @default(autoincrement())
+  chat       Chat         @relation(fields: [chatId], references: [id])
+  chatId     Int
+  title      String?
+  startDate  DateTime
+  endDate    DateTime
+  readingEnd DateTime
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  options    BookOption[]
 
   @@index([chatId, isActive])
 }

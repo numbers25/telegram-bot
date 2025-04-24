@@ -7,6 +7,8 @@ import { listBooks } from "./commands/listBooks";
 import { setCurrent } from "./admin/setCurrent";
 import { isCurrent } from "./commands/isCurrent";
 import { newPoll } from "./admin/newPoll";
+import { bootstrapSchedulers } from "./utils/broadcast";
+import { vote } from "./commands/voting";
 import "./utils/scheduler";
 
 config();
@@ -15,12 +17,15 @@ function createInitialSession(): MySession {
   return {};
 }
 
-const bot = new Bot<MyContext>(process.env.BOT_API!);
+export const bot = new Bot<MyContext>(process.env.BOT_API!);
 
 bot.use(session({ initial: createInitialSession }));
+
 bot.use(conversations());
 bot.use(createConversation(addBook));
 bot.use(createConversation(setCurrent));
+bot.use(createConversation(newPoll));
+bot.use(createConversation(vote));
 
 // COMMANDS
 bot.command("start", async (ctx) => {
@@ -43,13 +48,25 @@ bot.command("list", listBooks);
 // Check the current book
 bot.command("current", isCurrent);
 
+// Vote for a book
+bot.command("vote", async (ctx) => {
+  await ctx.conversation.enter("vote");
+});
+
 // Set the current book for the month - ADMIN
 bot.command("setcurrent", async (ctx) => {
   await ctx.conversation.enter("setCurrent");
 });
 
-// Create new poll - ADMIn
-bot.command("newpoll", newPoll);
+// Create new poll - ADMIN
+bot.command("newpoll", async (ctx) => {
+  await ctx.conversation.enter("newPoll");
+});
 
 bot.start();
 console.log("🤖 Bot is running...");
+
+(async () => {
+  await bootstrapSchedulers();
+  console.log("🤖 Scheduler bootstrapped.");
+})();

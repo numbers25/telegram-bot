@@ -1,97 +1,65 @@
 import cron from "node-cron";
-import { prisma } from "./prisma";
-import { Bot } from "grammy";
-import { config } from "dotenv";
+import { prisma } from "../utils/prisma";
+import { bot } from "../bot"; // ensure you export `bot` from bot.ts
+import { cfg } from "../admin/automaticPoll"; // the in-memory config
 
-config();
-const bot = new Bot(process.env.BOT_API!);
+// Run this every hour
+cron.schedule("0 * * * *", async () => {
+  if (!cfg) return; // not yet configured
 
-function getLastSunday(year: number, month: number): Date {
-  const d = new Date(year, month + 1, 0);
-  while (d.getDay() !== 0) d.setDate(d.getDate() - 1);
-  return d;
-}
+  // Find chats whose **last** poll's readingEnd is in the past
+  const chats = await prisma.chat.findMany({
+    include: {
+      polls: {
+        orderBy: { readingEnd: "desc" },
+        take: 1,
+      },
+    },
+  });
 
-// Closing previous poll and choosing winner!!
-cron.schedule("0 0 1 * *", async () => {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-
-  const activePolls = await prisma.poll.findMany({ where: { isActive: true } });
-  for (const prevPoll of activePolls) {
-    await prisma.poll.update({
-      where: { id: prevPoll.id },
-      data: { isActive: false },
-    });
-
-    // Tally votes
-    const results = await prisma.vote.groupBy({
-      by: ["optionId"],
-      where: { option: { pollId: prevPoll.id } },
-      _count: { optionId: true },
-      orderBy: { _count: { optionId: "desc" } },
-      take: 1,
-    });
-    if (results.length) {
-      const topId = results[0].optionId;
-      await prisma.bookOption.updateMany({
-        where: { pollId: prevPoll.id, currentRead: true },
-        data: { currentRead: false },
+  for (const chat of chats) {
+    const last = chat.polls[0];
+    // If no poll exists or readingEnd is passed, start a new cycle
+    if (!last || last.readingEnd <= now) {
+      // Deactivate any stray active poll
+      await prisma.poll.updateMany({
+        where: { chatId: chat.id, isActive: true },
+        data: { isActive: false },
       });
 
-      await prisma.bookOption.update({
-        where: { id: topId },
-        data: { currentRead: true },
+      // Compute the windows
+      const suggestionEnd = new Date(now);
+      suggestionEnd.setDate(suggestionEnd.getDate() + cfg.suggestionDays);
+
+      const votingEnd = new Date(suggestionEnd);
+      votingEnd.setDate(votingEnd.getDate() + cfg.votingDays);
+
+      const readingEnd = new Date(votingEnd);
+      readingEnd.setDate(readingEnd.getDate() + cfg.readingDays);
+
+      // Create the new poll
+      const poll = await prisma.poll.create({
+        data: {
+          chat: { connect: { id: chat.id } },
+          title: `Auto poll ${now.toDateString()}`,
+          startDate: suggestionEnd,
+          endDate: votingEnd,
+          readingEnd,
+          isActive: true,
+        },
       });
+
+      // Announce in the group
+      await bot.api.sendMessage(
+        chat.telegramChatId,
+        `🗳️ New automatic poll #${poll.id}!\n` +
+          `• Suggest until ${suggestionEnd.toDateString()}\n` +
+          `• Vote until ${votingEnd.toDateString()}\n` +
+          `• Read until ${readingEnd.toDateString()}`
+      );
     }
   }
-
-  // For each chat, create next poll
-  const chats = await prisma.chat.findMany();
-  for (const chat of chats) {
-    const nextYear = month === 11 ? year + 1 : year;
-    const nextMonth = (month + 1) % 12;
-    const pollStart = getLastSunday(year, month);
-    const pollEnd = new Date(year, month + 1, 0);
-
-    await prisma.poll.create({
-      data: {
-        chatId: chat.id,
-        title: `${nextYear}-${nextMonth + 1} Book Vote`,
-        startDate: pollStart,
-        endDate: pollEnd,
-        isActive: true,
-      },
-    });
-
-    await bot.api.sendMessage(
-      chat.telegramChatId,
-      `🗳️ A new book vote for ${nextYear}-${
-        nextMonth + 1
-      } is open for suggestions until ${pollStart.toDateString()}. Use /suggest to add your book!`
-    );
-  }
 });
 
-// 2️⃣ Last Sunday of month at 00:00 — ensure poll is open and announce
-cron.schedule("0 0 * * 0", async () => {
-  const now = new Date();
-  const d = getLastSunday(now.getFullYear(), now.getMonth());
-  if (now.getDate() !== d.getDate()) return;
-
-  const polls = await prisma.poll.findMany({ where: { isActive: true } });
-  for (const poll of polls) {
-    const chat = await prisma.chat.findUnique({ where: { id: poll.chatId } });
-    if (!chat) continue;
-    await bot.api.sendMessage(
-      chat.telegramChatId,
-      `🗳️ Voting for "${
-        poll.title
-      }" is now open until ${poll.endDate.toDateString()}! Use /vote to cast your vote.`
-    );
-  }
-});
-
-// Start the cron scheduler
-console.log("⏰ Scheduler running...");
+console.log("⏰ Automatic scheduling process, run /automatic to configure.");
